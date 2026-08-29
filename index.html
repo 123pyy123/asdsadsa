@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI简易记账本</title>
+  <title>黄冠鸿记事本</title>
   <style>
     :root {
       --primary: #2563eb;
@@ -139,7 +139,7 @@
 </head>
 <body>
 
-  <h1>📒 AI简易记账本</h1>
+  <h1>📒 黄冠鸿记事本</h1>
 
   <div class="card stat">
     <div class="stat-item">
@@ -465,7 +465,7 @@ function exportCSV() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `记账本_${new Date().toISOString().slice(0,10)}.csv`
+  a.download = `黄冠鸿记事本_${new Date().toISOString().slice(0,10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
