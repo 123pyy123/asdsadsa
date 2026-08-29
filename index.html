@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI简易记账本</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      max-width: 620px;
+      margin: 20px auto;
+      padding: 0 16px;
+      background: #f5f7fa;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    h1 {
+      text-align: center;
+      margin: 20px 0 10px;
+      color: #1f2937;
+      font-size: 28px;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+    input, select {
+      padding: 12px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      flex: 1;
+    }
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    button.del {
+      background: #ef4444;
+    }
+    button.del:hover {
+      background: #dc2626;
+    }
+    .stat {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-item {
+      flex: 1;
+      text-align: center;
+      padding: 16px 8px;
+      border-radius: 10px;
+      background: #f0f4ff;
+    }
+    .stat-item div:first-child {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .stat-item div:last-child {
+      font-size: 22px;
+      font-weight: 600;
+      color: #1e40af;
+    }
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .income { color: #16a34a; font-weight: 500; }
+    .expense { color: #ef4444; font-weight: 500; }
+    .upload-area {
+      border: 3px dashed #cbd5e1;
+      padding: 40px 20px;
+      text-align: center;
+      border-radius: 12px;
+      margin: 20px 0;
+      transition: all 0.3s;
+    }
+    .upload-area:hover {
+      border-color: var(--primary);
+      background: #f8fafc;
+    }
+    #previewImg {
+      max-width: 100%;
+      max-height: 240px;
+      margin: 15px 0;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      display: none;
+    }
+    .tip {
+      font-size: 13px;
+      color: #64748b;
+      margin: 8px 0 16px;
+    }
+    .chart-container {
+      margin: 20px 0;
+    }
+    .chart-container canvas {
+      width: 100% !important;
+      height: auto !important;
+    }
+    .export-btn {
+      margin-top: 12px;
+    }
+    .ai-btn {
+      background: #7c3aed;
+    }
+    .ai-btn:hover {
+      background: #6d28d9;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📒 AI简易记账本</h1>
+
+  <div class="card stat">
+    <div class="stat-item">
+      <div>总收入</div>
+      <div id="totalIncome">¥0.00</div>
+    </div>
+    <div class="stat-item">
+      <div>总支出</div>
+      <div id="totalExpense">¥0.00</div>
+    </div>
+    <div class="stat-item">
+      <div>结余</div>
+      <div id="balance">¥0.00</div>
+    </div>
+  </div>
+
+  <div class="card chart-container">
+    <h3 style="margin-bottom:15px;color:#334155">📊 月度收支趋势</h3>
+    <canvas id="chart" width="500" height="220"></canvas>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">✍️ 手动新增</h3>
+    <div class="row">
+      <select id="type" style="width:120px">
+        <option value="expense">支出</option>
+        <option value="income">收入</option>
+      </select>
+      <input id="money" type="number" placeholder="金额" step="0.01" style="flex:1">
+      <input id="remark" type="text" placeholder="备注（可选）" style="flex:1">
+      <button onclick="addRecord()">添加记录</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">🤖 AI 自动识别账单</h3>
+    <div class="tip">上传账单截图或直接粘贴图片，AI 自动识别金额、类型和备注</div>
+    
+    <div class="upload-area" id="uploadArea">
+      <input type="file" id="imgFile" accept="image/*" style="display:none">
+      <div style="font-size:18px;margin-bottom:8px">📸 点击选择图片或拖拽上传</div>
+      <div style="color:#64748b">或按 Ctrl + V 粘贴截图</div>
+    </div>
+
+    <img id="previewImg" alt="预览图片">
+
+    <div class="row" style="margin-top:15px">
+      <input id="apiKey" type="password" placeholder="输入你的豆包 API Key" style="flex:1">
+      <button class="ai-btn" onclick="aiOcrBill()">AI 识别记账</button>
+    </div>
+
+    <div class="tip">⚠️ API Key 仅前端使用，建议正式环境后端代理</div>
+    <div id="aiResult" style="margin-top:15px;font-size:15px;min-height:80px"></div>
+  </div>
+
+  <div class="card">
+    <div id="recordList" style="min-height:300px"></div>
+  </div>
+
+  <div class="card" style="display:flex;gap:12px;flex-wrap:wrap">
+    <button onclick="exportCSV()" class="export-btn">📥 导出 CSV</button>
+    <button onclick="clearAll()" class="del">🗑 清空所有记录</button>
+  </div>
+
+<script>
+let records = JSON.parse(localStorage.getItem('book')) || []
+let currentBill = null
+let base64Image = null
+
+function save() {
+  localStorage.setItem('book', JSON.stringify(records))
+}
+
+function render() {
+  let html = ''
+  let income = 0, expense = 0
+
+  records.forEach(r => {
+    if (r.type === 'income') income += r.money
+    else expense += r.money
+
+    const color = r.type === 'income' ? '#16a34a' : '#ef4444'
+    html += `
+    <div class="list-item">
+      <div>
+        <div style="font-weight:500">${r.remark || '未备注'}</div>
+        <div style="font-size:13px;color:#64748b">${r.time}</div>
+      </div>
+      <div style="text-align:right">
+        <span style="color:${color};font-size:18px">${r.type==='income'?'+':'-'}${r.money.toFixed(2)}</span>
+        <button class="del" onclick="del(${r.id})" style="margin-left:12px">删除</button>
+      </div>
+    </div>`
+  })
+
+  document.getElementById('recordList').innerHTML = html
+
+  const stats = income - expense
+  document.getElementById('totalIncome').textContent = `¥${income.toFixed(2)}`
+  document.getElementById('totalExpense').textContent = `¥${expense.toFixed(2)}`
+  document.getElementById('balance').textContent = `¥${stats.toFixed(2)}`
+
+  renderChart()
+}
+render()
+
+function renderChart() {
+  const canvas = document.getElementById('chart')
+  const ctx = canvas.getContext('2d')
+  
+  const grouped = {}
+  records.forEach(r => {
+    const m = new Date(r.time).toISOString().slice(0,7)
+    if (!grouped[m]) grouped[m] = {income:0, expense:0}
+    grouped[m][r.type === 'income' ? 'income' : 'expense'] += r.money
+  })
+
+  const months = Object.keys(grouped).sort()
+  const incomes = months.map(m => grouped[m].income)
+  const expenses = months.map(m => grouped[m].expense)
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  const padding = 50
+  const barW = 28
+  const gap = 18
+  const maxVal = Math.max(...incomes, ...expenses, 1)
+
+  months.forEach((m, i) => {
+    const x = padding + i * (canvas.width - padding * 2) / months.length + gap
+    const h = ((incomes[i] || 0) / maxVal) * (canvas.height - padding * 1.5)
+    ctx.fillStyle = '#16a34a'
+    ctx.fillRect(x, canvas.height - padding - h, barW, h)
+
+    const eH = ((expenses[i] || 0) / maxVal) * (canvas.height - padding * 1.5)
+    ctx.fillStyle = '#ef4444'
+    ctx.fillRect(x + barW + gap, canvas.height - padding - eH, barW, eH)
+  })
+}
+
+function addRecord(item) {
+  if (item) {
+    currentBill = {
+      id: Date.now(),
+      type: item.type,
+      money: Number(item.money),
+      remark: item.remark || 'AI自动识别',
+      time: new Date().toLocaleString()
+    }
+    records.push(currentBill)
+    save()
+    render()
+  } else {
+    const type = document.getElementById('type').value
+    const money = parseFloat(document.getElementById('money').value)
+    const remark = document.getElementById('remark').value.trim()
+    
+    if (!money || money <= 0) {
+      alert('请输入有效的金额')
+      return
+    }
+    records.push({
+      id: Date.now(),
+      type,
+      money,
+      remark: remark || '未备注',
+      time: new Date().toLocaleString()
+    })
+    document.getElementById('money').value = ''
+    document.getElementById('remark').value = ''
+    save()
+    render()
+  }
+}
+
+function del(id) {
+  if (confirm('确定要删除这条记录吗？')) {
+    records = records.filter(r => r.id !== id)
+    save()
+    render()
+  }
+}
+
+async function aiOcrBill() {
+  const apiKey = document.getElementById('apiKey').value.trim()
+  if (!apiKey || !base64Image) {
+    alert('请先上传图片并输入API Key')
+    return
+  }
+
+  const resultDom = document.getElementById('aiResult')
+  resultDom.innerHTML = '<div style="color:#7c3aed">AI识别中...</div>'
+
+  try {
+    const res = await fetch("https://ark.cn-beijing.volces.com/api/v3/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "doubao-vision-pro",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "你是专业的账单识别助手。请严格按照JSON格式输出，只返回JSON，不要有任何其他文字。字段：type（expense支出/income收入），money（金额，最多两位小数），remark（备注，最多30字）" },
+            { type: "image_url", image_url: { url: base64Image } }
+          ]
+        }]
+      })
+    })
+
+    const data = await res.json()
+    
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error("API返回格式异常")
+    }
+
+    const reply = data.choices[0].message.content
+    const jsonStr = reply.match(/\{[\s\S]*?\}/)
+    if (!jsonStr) throw new Error("无法提取JSON")
+
+    const billObj = JSON.parse(jsonStr[0])
+
+    if (!billObj.type || !['expense','income'].includes(billObj.type) || 
+        typeof billObj.money !== 'number' || billObj.money <= 0 || !billObj.remark) {
+      throw new Error("识别结果不完整")
+    }
+
+    resultDom.innerHTML = `
+      <div style="color:#16a34a;font-weight:500">✅ 识别成功</div>
+      <div>金额：${billObj.money}，类型：${billObj.type==='income'?'收入':'支出'}，备注：${billObj.remark}</div>
+      <div style="margin-top:15px">
+        <button onclick="confirmBill()" style="padding:10px 20px;background:#16a34a">确认添加</button>
+        <button onclick="resetAI()" style="margin-left:10px;padding:10px 20px;background:#ef4444">重新识别</button>
+      </div>
+    `
+
+  } catch (err) {
+    resultDom.innerHTML = `<div style="color:#ef4444">识别失败：${err.message}</div>`
+  }
+}
+
+function confirmBill() {
+  if (currentBill) {
+    addRecord(currentBill)
+    document.getElementById('aiResult').innerHTML = ''
+    base64Image = null
+    document.getElementById('previewImg').style.display = 'none'
+    document.getElementById('previewImg').src = ''
+  }
+}
+
+function resetAI() {
+  document.getElementById('aiResult').innerHTML = ''
+  currentBill = null
+  base64Image = null
+  document.getElementById('previewImg').style.display = 'none'
+  document.getElementById('previewImg').src = ''
+}
+
+document.getElementById('imgFile').addEventListener('change', function(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = function(ev) {
+    base64Image = ev.target.result
+    document.getElementById('previewImg').src = base64Image
+    document.getElementById('previewImg').style.display = 'block'
+  }
+  reader.readAsDataURL(file)
+})
+
+document.getElementById('uploadArea').addEventListener('click', () => document.getElementById('imgFile').click())
+
+document.getElementById('uploadArea').addEventListener('dragover', e => e.preventDefault())
+document.getElementById('uploadArea').addEventListener('drop', e => {
+  e.preventDefault()
+  if (e.dataTransfer.files.length) {
+    const file = e.dataTransfer.files[0]
+    const reader = new FileReader()
+    reader.onload = function(ev) {
+      base64Image = ev.target.result
+      document.getElementById('previewImg').src = base64Image
+      document.getElementById('previewImg').style.display = 'block'
+    }
+    reader.readAsDataURL(file)
+  }
+})
+
+document.addEventListener('paste', function(e) {
+  const items = e.clipboardData?.items || []
+  for (let item of items) {
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file) {
+        const reader = new FileReader()
+        reader.onload = function(ev) {
+          base64Image = ev.target.result
+          document.getElementById('previewImg').src = base64Image
+          document.getElementById('previewImg').style.display = 'block'
+        }
+        reader.readAsDataURL(file)
+      }
+      return
+    }
+  }
+})
+
+function exportCSV() {
+  if (records.length === 0) {
+    alert('暂无记录')
+    return
+  }
+
+  let csv = '时间,类型,金额,备注\n'
+  records.forEach(r => {
+    const t = r.type === 'income' ? '收入' : '支出'
+    csv += `${r.time},${t},${r.money.toFixed(2)},"${r.remark.replace(/"/g,'""')}"\n`
+  })
+
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `记账本_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function clearAll() {
+  if (confirm('确定要清空所有记录吗？')) {
+    records = []
+    save()
+    render()
+  }
+}
+</script>
+</body>
+</html>
